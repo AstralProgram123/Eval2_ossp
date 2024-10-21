@@ -1,0 +1,49 @@
+import requests
+from bs4 import BeautifulSoup
+import pandas as pd
+from pymongo import MongoClient 
+
+url="https://www.ttfi.org/events/ranking/MjAyNA==/NDk"
+response=requests.get(url)
+soup=BeautifulSoup(response.content,'html.parser')
+data=[]
+table=soup.find("table")
+rows=table.find_all('tr')
+for row in rows[1:]:
+    cols = row.find_all('td')
+    if len(cols) < 5:
+        continue
+    
+    ttf_id = cols[1].text.strip()
+    name = cols[2].text.strip()
+    state = cols[3].text.strip()
+    dob = cols[4].text.strip()
+    national_rank = int(cols[12].text.strip())
+
+    data.append({
+        'TTFI ID': ttf_id,
+        'Name': name,
+        'State': state,
+        'DOB': dob,
+        'National Ranking': national_rank
+    })
+df = pd.DataFrame(data)
+players_19_to_25 = df[(df['National Ranking'] >= 19) & (df['National Ranking'] <= 25)]
+print(f"Number of players from rank 19 to 25: {len(players_19_to_25)}")
+#df['DOB'] = pd.to_datetime(df['DOB'], errors='coerce')
+#players_born_after_2010 = df[df['DOB'].year > 2010]
+#print("Players born after 2010:")
+#print(players_born_after_2010[['TTFI ID', 'Name', 'DOB']])
+
+client = MongoClient('mongodb://localhost:27017/')
+db = client['ttfi_rankings']
+collection = db['players']
+collection.insert_many(data)
+up_players = collection.find({"State": "UP"})
+print("\n Players from Uttar Pradesh:")
+for player in up_players:
+    print('\n',player)
+rank_10_player = collection.find_one({"National Ranking": 10})
+print("\n Player with National Ranking 10:")
+print(rank_10_player)
+client.close()
